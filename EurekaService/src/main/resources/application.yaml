@@ -1,0 +1,7 @@
+server:
+  port: 8761 # Standard port for Eureka
+
+eureka:
+  client:
+    register-with-eureka: false # It's the server, it doesn't register itself
+    fetch-registry: false       # It doesn't need to fetch a registry

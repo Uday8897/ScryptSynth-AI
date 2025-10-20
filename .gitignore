@@ -1,0 +1,65 @@
+# --- User Specific Rules ---
+# Ignore all .env files (and variations like .env.local) in all subdirectories
+**/.env*
+
+# Ignore local database directories or files
+local_db/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Python ---
+# Ignore Python virtual environments
+**/venv/
+
+# Ignore Python compiled files and caches
+**/__pycache__/
+*.py[cod]
+
+# Ignore Python distribution and build artifacts
+**/build/
+**/dist/
+*.egg-info/
+*.egg
+
+# Ignore testing and coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# --- Java / Spring Boot (Maven) ---
+# Ignore Maven compiled output directory
+**/target/
+
+# Ignore build artifacts (the packaged application)
+*.jar
+*.war
+*.ear
+
+# Ignore log files
+**/*.log
+
+# --- Frontend (Node.js / JavaScript) ---
+# Ignore dependencies
+**/node_modules/
+
+# Ignore log files
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- IDE & OS Specific ---
+# JetBrains (IntelliJ, PyCharm, etc.) - as seen in your screenshot
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini

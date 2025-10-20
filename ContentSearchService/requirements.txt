@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pymongo
+dnspython
+python-dotenv
+requests
+py-eureka-client
+pydantic
+httpx

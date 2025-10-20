@@ -1,0 +1,11 @@
+# For handling .env files
+python-dotenv
+
+# The official MongoDB driver
+pymongo
+
+# For making HTTP requests to the TMDB API
+requests
+
+# For creating beautiful progress bars in the terminal
+tqdm

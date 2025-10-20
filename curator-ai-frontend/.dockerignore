@@ -1,0 +1,14 @@
+# Ignore dependencies
+node_modules/
+
+# Ignore build output (we will create this inside the container)
+dist/
+
+# Ignore .env files (we will pass these as build arguments)
+.env
+.env.*
+
+# Ignore git and other local files
+.git
+.gitignore
+README.md

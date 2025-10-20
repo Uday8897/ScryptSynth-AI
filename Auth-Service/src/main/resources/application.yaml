@@ -1,0 +1,32 @@
+server:
+  port: 9001
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/curator_db
+    username: postgres
+    password: uday
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+  rabbitmq:
+    host: localhost
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# Secret key for SIGNING JWTs. MUST BE IDENTICAL to the one in User Service.
+jwt:
+  # Secret key for VALIDATING JWTs. This MUST exist and be IDENTICAL to the one in Auth Service.
+  secret: "VGhlQ3VyYXRvckFJUHJvamVjdFNlYyNldEtleUZvckhTMjU2QWxnb3JpdGhtSXNWZXJ5U2VjdXJlYW5kTG9uZw=="
+  expiration-ms: 86400000 # 24 hours
+
+# Custom properties for our AMQP publisher
+amqp:
+  exchange: "user_events_exchange"
+  routing-key: "user.registered"

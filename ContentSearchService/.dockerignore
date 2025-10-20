@@ -1,0 +1,18 @@
+venv/
+.venv/
+
+# Ignore local database storage
+local_chroma_db/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore .env files (we inject these at runtime)
+.env
+.env.*
+
+# Ignore IDE/OS files
+.idea/
+.vscode/
+.DS_Store

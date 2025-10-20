@@ -1,0 +1,39 @@
+server:
+  port: 9002
+
+spring:
+  application:
+    name: watch-history-service
+
+  # ==========================================================
+  # THIS IS THE CRITICAL SECTION THAT IS LIKELY MISSING OR WRONG
+  # ==========================================================
+  datasource:
+    url: jdbc:postgresql://localhost:5432/curator_db
+    username: postgres
+    password: uday
+    driver-class-name: org.postgresql.Driver # Explicitly setting the driver is good practice
+
+  jpa:
+    hibernate:
+      ddl-auto: update # For development
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect # Explicitly set the dialect
+        format_sql: true # Makes the logs easier to read
+    show-sql: true
+  # ==========================================================
+
+  rabbitmq:
+    host: localhost
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# Custom properties for our AMQP configuration
+amqp:
+  exchange: "user_events_exchange"
+  routing-key: "user.activity.rated"
+  queue: "user_activity_queue"

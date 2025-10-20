@@ -1,0 +1,95 @@
+server:
+  port: 8080 # The single, public-facing port
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # --- GLOBAL CORS CONFIGURATION ---
+          globalcors:
+            cors-configurations:
+              '[/**]': # Apply this configuration to all paths
+                allowedOrigins: "http://localhost:5173" # Your React frontend URL
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS # Crucial for preflight
+                allowedHeaders: "*"
+                allowCredentials: true
+
+          # --- ROUTE CONFIGURATIONS ---
+          routes:
+            # Route for Auth Service (Public)
+            - id: auth-service-route
+              uri: lb://auth-service
+              predicates:
+                - Path=/auth/**
+
+            # Route for User Service (Secured)
+            - id: user-service-route
+              uri: lb://user-service
+              predicates:
+                - Path=/api/users/**
+              filters:
+                - AuthenticationFilter
+
+            # Route for Watch-History Service (Secured)
+            - id: watch-history-service-route
+              uri: lb://watch-history-service
+              predicates:
+                - Path=/api/history/**
+              filters:
+                - AuthenticationFilter
+
+            # Route for AI Service (Secured)
+            - id: ai-service-route
+              uri: lb://ai-service
+              predicates:
+                - Path=/api/ai/**
+              filters:
+                - AuthenticationFilter
+
+            # Route for Content Search Service (Public)
+            - id: content-search-service-route
+              uri: lb://content-search-service
+              predicates:
+                - Path=/api/content/**
+              # No AuthenticationFilter - Public access
+
+            # ==========================================================
+            # NEW ROUTE: Follow Service (Secured)
+            # ==========================================================
+            - id: follow-service-route
+              uri: lb://follow-service # Use service name registered in Eureka
+              predicates:
+                - Path=/api/social/** # Match the controller's @RequestMapping
+              filters:
+                - AuthenticationFilter # Following/unfollowing requires login
+
+            # ==========================================================
+            # NEW ROUTE: Feed Service (Secured)
+            # ==========================================================
+            - id: feed-service-route
+              uri: lb://feed-service # Use service name registered in Eureka
+              predicates:
+                - Path=/api/feed/** # Match the controller's @RequestMapping
+              filters:
+                - AuthenticationFilter # Accessing feed requires login
+            # ==========================================================
+
+# --- Service Discovery ---
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# --- JWT Configuration (Needed for AuthenticationFilter) ---
+jwt:
+  # Secret key MUST BE IDENTICAL to the one in Auth Service.
+  secret: "VGhlQ3VyYXRvckFJUHJvamVjdFNlY3JldEtleUZvckhTMjU2QWxnb3JpdGhtSXNWZXJ5U2VjdXJlYW5kTGuZw=="

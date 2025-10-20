@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@theme {
+  /* 🎬 Noir & Neon - Cyberpunk Thriller */
+  --color-background: #0A0B10;    /* Deep, inky black for maximum contrast */
+  --color-surface: #151821;       /* Slightly elevated surface, like a shadowy alley */
+  --color-primary: #7B61FF;       /* Electric Purple - The main neon sign */
+  --color-secondary: #00F0FF;     /* Cyan Burst - A vibrant, energetic accent */
+  --color-accent: #FF2A6D;        /* Hot Pink - A shocking, dramatic highlight */
+  --color-text-main: #F0F2FF;     /* Bright, almost white text for readability */
+  --color-text-secondary: #8B9BB4;/* Muted blue-grey for secondary info */
+  --color-border: #2A3140;        /* Border color that blends with surfaces */
+
+  /* Typography */
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Orbitron', monospace; /* A tech-focused font for headers */
+
+  /* Effects */
+  --radius-card: 0.5rem;          /* Slightly sharper radii for a tech feel */
+  --shadow-card: 0 0 15px rgba(123, 97, 255, 0.2); /* Glow effects */
+}
