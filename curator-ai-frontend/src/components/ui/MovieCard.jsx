@@ -1,44 +1,128 @@
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom'; // Import Link
-import { Star } from 'lucide-react';
-import { fadeInUp } from '../../animations/variants'; // Assuming variants are in this path
-const MovieCard = ({ movie }) => {
-  const posterUrl = movie.poster_path
-    ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-    : '/placeholder-poster.png'; // Make sure you have this placeholder image
+import { Star, Film, ImageOff } from 'lucide-react';
+import { fadeInUp } from '../../animations/variants';
 
-  const year = movie.release_date ? `(${movie.release_date.substring(0, 4)})` : '';
+const MovieCard = ({ movie, className = '' }) => {
+  // Validate movie data
+  if (!movie) {
+    return (
+      <div className={`aspect-[2/3] bg-surface rounded-lg flex flex-col items-center justify-center text-text-secondary p-4 text-center border border-border ${className}`}>
+        <ImageOff size={40} className="mb-2 text-red-500"/>
+        <p className="text-sm">Invalid movie data</p>
+      </div>
+    );
+  }
 
-  return (
+  // FIX: Use both tmdbId and id fields - prioritize tmdbId, fallback to id
+  const tmdbId = movie.tmdbId || movie.id;
+  const { 
+    title, 
+    poster_path, 
+    poster_url, 
+    rating, 
+    year, 
+    genres = [] 
+  } = movie;
+
+  // Check if movie has valid ID for navigation
+  const hasValidId = tmdbId && tmdbId > 0;
+  
+  // Handle poster image
+  const posterUrl = poster_url || (poster_path ? `https://image.tmdb.org/t/p/w500${poster_path}` : null);
+  
+  // Card content
+  const cardContent = (
     <motion.div
-      layout // Add layout prop for smoother animations
-      variants={fadeInUp} // Use variants from parent stagger
-      className="group" // Add group for hover effects if needed later
+      variants={fadeInUp}
+      className={`group relative aspect-[2/3] bg-surface rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border border-border hover:border-primary/30 ${className} ${
+        !hasValidId ? 'opacity-70 cursor-not-allowed' : ''
+      }`}
     >
-      {/* Link wraps the image */}
-      <Link to={`/movie/${movie.id}`} title={movie.title}>
-        <motion.div
-          className="relative overflow-hidden rounded-lg shadow-lg cursor-pointer aspect-[2/3] mb-2" // Added margin-bottom
-          whileHover={{ scale: 1.05, boxShadow: "0px 10px 30px rgba(139, 92, 246, 0.4)" }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      {/* Poster Image */}
+      <div className="relative w-full h-full">
+        {posterUrl ? (
+          <img
+            src={posterUrl}
+            alt={title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        
+        {/* Fallback when no image */}
+        <div 
+          className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface to-background text-text-secondary ${
+            posterUrl ? 'hidden' : 'flex'
+          }`}
         >
-          <img src={posterUrl} alt={movie.title} className="w-full h-full object-cover bg-surface" />
-           {/* Optional: Add a subtle overlay on hover */}
-           <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-200"></div>
-           {/* Display rating on the poster */}
-           {movie.vote_average > 0 && (
-              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/70 text-yellow-400 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
-                  <Star size={12} fill="currentColor"/>
-                  <span>{movie.vote_average.toFixed(1)}</span>
+          <Film size={48} className="mb-2 opacity-50" />
+          <p className="text-sm text-center px-2 opacity-70">No poster available</p>
+        </div>
+
+        {/* Overlay on hover */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all duration-300 flex items-end">
+          <div className="p-4 w-full transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+            <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2">
+              {title}
+            </h3>
+            
+            <div className="flex items-center justify-between text-xs text-white/80">
+              <span>{year || 'Unknown'}</span>
+              {rating && (
+                <div className="flex items-center gap-1">
+                  <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                  <span>{rating.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+
+            {genres.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {genres.slice(0, 2).map((genre, index) => (
+                  <span 
+                    key={index}
+                    className="px-2 py-1 bg-primary/80 text-white text-xs rounded-full"
+                  >
+                    {genre}
+                  </span>
+                ))}
               </div>
-           )}
-        </motion.div>
-      </Link>
-      {/* Title and Year below the card */}
-      <h3 className="text-sm font-medium text-text-main truncate group-hover:text-primary transition-colors duration-200">{movie.title}</h3>
-      <p className="text-xs text-text-secondary">{year}</p>
+            )}
+
+            {/* Debug info - shows the actual ID being used */}
+            {hasValidId && (
+              <div className="mt-2 text-xs text-white/60">
+                ID: {tmdbId}
+              </div>
+            )}
+
+            {/* Warning for invalid ID */}
+            {!hasValidId && (
+              <div className="mt-2 px-2 py-1 bg-red-500/80 text-white text-xs rounded text-center">
+                Missing TMDB ID
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
+
+  // Only make it a link if we have a valid ID
+  if (hasValidId) {
+    return (
+      <Link to={`/movie/${tmdbId}`} className="block">
+        {cardContent}
+      </Link>
+    );
+  }
+
+  // Otherwise return just the card without navigation
+  return cardContent;
 };
 
 export default MovieCard;

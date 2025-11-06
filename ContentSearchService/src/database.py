@@ -27,4 +27,4 @@ class Database:
         else:
             print("Text search index already exists.")
 
-db = Database()
+db = Database() 

@@ -1,20 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, LoaderCircle, Film } from 'lucide-react';
-import api from '../../api';
-import useDebounce from '../../hooks/useDebounce'; // Import our new hook
+import { searchMoviesApi } from '../../api'; // Import the specific API function
+import useDebounce from '../../hooks/useDebounce';
 
-// A small component for displaying each search result item
 const SearchResultItem = ({ movie, onResultClick }) => {
   const posterUrl = movie.poster_path
-    ? `https://image.tmdb.org/t/p/w92${movie.poster_path}` // Use a small poster size
+    ? `https://image.tmdb.org/t/p/w92${movie.poster_path}`
     : null;
   const year = movie.release_date ? `(${movie.release_date.substring(0, 4)})` : '';
 
   return (
     <Link
-      to={`/movie/${movie._id}`}
+      to={`/movie/${movie.id || movie._id}`}
       onClick={onResultClick}
       className="flex items-center p-3 hover:bg-primary/20 rounded-lg transition-colors duration-150"
     >
@@ -33,17 +32,15 @@ const SearchResultItem = ({ movie, onResultClick }) => {
   );
 };
 
-
 const SearchBar = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   
-  const debouncedQuery = useDebounce(query, 300); // Debounce user input by 300ms
-  const searchBarRef = useRef(null); // Ref to detect clicks outside the component
+  const debouncedQuery = useDebounce(query, 300);
+  const searchBarRef = useRef(null);
 
-  // Effect to fetch search results when debounced query changes
   useEffect(() => {
     const fetchResults = async () => {
       if (debouncedQuery.length < 2) {
@@ -54,25 +51,31 @@ const SearchBar = () => {
 
       setIsLoading(true);
       try {
-        console.log(`Searching for: ${debouncedQuery}`);
-        const response = await api.get('/api/content/search', {
-          params: { query: debouncedQuery }
-        });
-        setResults(response.data);
-      } catch (error) {
-        if (error.response?.status !== 404) { // Don't log "not found" as an error
-            console.error("Search API error:", error);
+        console.log(`🔍 Searching for: "${debouncedQuery}"`);
+        const response = await searchMoviesApi(debouncedQuery, 10);
+        
+        console.log(`✅ Search response:`, response.data);
+        
+        // Handle the response format
+        if (response.data.movies) {
+          setResults(response.data.movies);
+        } else if (Array.isArray(response.data)) {
+          setResults(response.data);
+        } else {
+          setResults([]);
         }
-        setResults([]); // Clear results on error or if not found
+        
+      } catch (error) {
+        console.error(`❌ Search API error:`, error);
+        setResults([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchResults();
-  }, [debouncedQuery]); // This effect runs only when the debouncedQuery changes
+  }, [debouncedQuery]);
 
-  // Effect to handle clicks outside the search bar to close results
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchBarRef.current && !searchBarRef.current.contains(event.target)) {
@@ -86,7 +89,6 @@ const SearchBar = () => {
   }, []);
   
   const handleResultClick = () => {
-      // Clear results and focus when a movie is selected
       setQuery('');
       setResults([]);
       setIsFocused(false);
@@ -95,7 +97,7 @@ const SearchBar = () => {
   const showResults = isFocused && (query.length >= 2);
 
   return (
-    <div className="relative w-full" ref={searchBarRef}>
+    <div className="relative w-full max-w-md" ref={searchBarRef}>
       <div className="relative">
         <input
           type="text"
@@ -114,7 +116,6 @@ const SearchBar = () => {
         </div>
       </div>
       
-      {/* Search Results Dropdown */}
       <AnimatePresence>
         {showResults && (
           <motion.div
@@ -125,14 +126,18 @@ const SearchBar = () => {
             className="absolute top-full mt-2 w-full bg-surface border border-border rounded-lg shadow-2xl z-50 max-h-96 overflow-y-auto"
           >
             {results.length > 0 ? (
-              results.map(movie => (
-                <SearchResultItem key={movie._id} movie={movie} onResultClick={handleResultClick} />
+              results.map((movie, index) => (
+                <SearchResultItem 
+                  key={movie.id || movie._id || index} 
+                  movie={movie} 
+                  onResultClick={handleResultClick} 
+                />
               ))
-            ) : !isLoading && debouncedQuery.length >=2 ? ( // Show "No results" only after loading and if there's a query
+            ) : !isLoading && debouncedQuery.length >= 2 ? (
               <div className="p-4 text-center text-text-secondary italic">
                 No results found for "{debouncedQuery}"
               </div>
-            ) : null }
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>

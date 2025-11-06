@@ -1,63 +1,117 @@
 import pika
-import json  # Make sure this import is at the top
+import json
+import time
+import logging
+import sys
 from app.config.settings import settings
 from app.services.memory_service import MemoryService
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [Consumer] - %(message)s')
+logger = logging.getLogger(__name__)
+
+def connect_rabbitmq(retries=5, delay=5):
+    """Try to connect to RabbitMQ with retry mechanism."""
+    for attempt in range(1, retries + 1):
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=settings.RABBITMQ_HOST,
+                    heartbeat=600,
+                    blocked_connection_timeout=300
+                )
+            )
+            logger.info("✅ Connected to RabbitMQ successfully.")
+            return connection
+        except pika.exceptions.AMQPConnectionError as e:
+            logger.warning(f"⚠️ RabbitMQ connection failed (attempt {attempt}/{retries}): {e}")
+            time.sleep(delay * attempt) # Exponential backoff
+            
+    logger.error(f"❌ Failed to connect to RabbitMQ after {retries} attempts.")
+    raise RuntimeError("❌ Failed to connect to RabbitMQ.")
+
+
 def start_consuming():
     """
-    Connects to RabbitMQ and starts consuming messages from the queue.
-    This function will run in a separate process.
+    RabbitMQ consumer that listens for user activity events and stores them in Supabase memory.
     """
-    print("Starting RabbitMQ consumer...")
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.RABBITMQ_HOST))
-    channel = connection.channel()
-    
-    channel.queue_declare(queue=settings.RABBITMQ_QUEUE, durable=True)
-    
-    memory_service = MemoryService()
+    logger.info("🚀 Starting RabbitMQ consumer...")
 
-    # ==========================================================
-    # PASTE THE NEW, ROBUST CALLBACK FUNCTION HERE
-    # ==========================================================
-    def callback(ch, method, properties, body):
-        """
-        This function is executed whenever a message is received.
-        It's robust against empty or malformed JSON messages.
-        """
-        print(f" [x] Received message from RabbitMQ")
-        try:
-            # First, decode the message from bytes to a string
-            message_body_str = body.decode('utf-8')
+    try:
+        memory_service = MemoryService()
+        logger.info("✅ MemoryService initialized successfully.")
+    except Exception as e:
+        logger.error(f"💥 FATAL: Consumer could not initialize MemoryService (check Supabase/model?): {e}", exc_info=True)
+        return # Cannot run without memory service
 
-            # Check for an empty message body right away
-            if not message_body_str.strip():
-                print(" [!] Received an empty message. Acknowledging and discarding.")
+    connection = None
+    try:
+        connection = connect_rabbitmq()
+        channel = connection.channel()
+        
+        channel.queue_declare(queue=settings.RABBITMQ_QUEUE, durable=True)
+        channel.basic_qos(prefetch_count=1) # Only fetch 1 message at a time
+
+        def callback(ch, method, properties, body):
+            """Process incoming AMQP events."""
+            try:
+                message_data = json.loads(body.decode("utf-8"))
+                
+                # Extract data from the Java DTO
+                user_id = message_data.get("userId")
+                content_id = message_data.get("contentId")
+                rating = message_data.get("rating")
+                review_text = message_data.get("reviewText")
+                # Use contentId as a fallback for movie title if not provided
+                content_title = message_data.get("contentTitle", f"MovieID_{content_id}") 
+
+                
+                if not user_id or not content_id:
+                    logger.warning(f"⚠️ Received invalid message (missing userId or contentId): {message_data}")
+                    ch.basic_ack(delivery_tag=method.delivery_tag) # Acknowledge and discard
+                    return
+
+                logger.info(f"📨 Received event for user={user_id}, contentId={content_id}")
+
+                # --- THIS IS THE FIX ---
+                # Changed 'movie_id=content_id' to 'movie_title=content_title'
+                # to match the function definition in MemoryService
+                memory_service.add_user_review(
+                    user_id=str(user_id),
+                    movie_title=content_title, # Use the extracted title
+                    review_text=review_text or "No review text provided.",
+                    rating=float(rating) if rating is not None else None
+                )
+                # --- END OF FIX ---
+
                 ch.basic_ack(delivery_tag=method.delivery_tag)
-                return
+                logger.info(f"✅ Processed event for user {user_id}")
 
-            # Now, try to parse the JSON
-            message_data = json.loads(message_body_str)
-            user_id = message_data.get("userId")
-            content = message_data.get("content")
-            
-            if user_id and content:
-                memory_service.add_memory(user_id=user_id, text_content=content)
-                print(f" [+] Successfully processed and added memory for user: {user_id}")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            else:
-                print(" [!] Message missing 'userId' or 'content'. Acknowledging and discarding.")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except json.JSONDecodeError:
+                logger.error(f"❌ Failed to decode JSON from message. Body: {body.decode('utf-8')}")
+                ch.basic_ack(delivery_tag=method.delivery_tag) # Discard bad message
+            except Exception as e:
+                logger.error(f"❌ Error processing RabbitMQ message: {e}", exc_info=True)
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+                time.sleep(5)
 
-        except json.JSONDecodeError:
-            # This will catch malformed JSON that isn't just an empty string
-            print(f" [!] Failed to decode JSON. Discarding malformed message.")
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-        except Exception as e:
-            # Catch any other unexpected errors
-            print(f" [!] An unexpected error occurred: {e}")
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+        channel.basic_consume(
+            queue=settings.RABBITMQ_QUEUE,
+            on_message_callback=callback,
+            auto_ack=False # We handle acknowledgements manually
+        )
 
-    channel.basic_consume(queue=settings.RABBITMQ_QUEUE, on_message_callback=callback)
+        logger.info(f"🎯 Waiting for events on queue '{settings.RABBITMQ_QUEUE}'...")
+        channel.start_consuming()
 
-    print(' [*] Waiting for messages. To exit press CTRL+C')
-    channel.start_consuming()
+    except Exception as e:
+        logger.error(f"❌ RabbitMQ consumer fatal error: {e}", exc_info=True)
+    finally:
+        if connection and connection.is_open:
+            connection.close()
+            logger.info("🔒 RabbitMQ connection closed.")
+
+def start_rabbitmq_consumer():
+    """Thread-safe entry point (used in main.py)"""
+    logger.info("🚀 Launching RabbitMQ background consumer...")
+    start_consuming()

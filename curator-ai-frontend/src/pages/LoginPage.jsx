@@ -25,7 +25,7 @@ const LoginPage = () => {
     }
 
     setIsLoading(true);
-    toast.loading('Authenticating your cinematic identity...');
+    toast.loading('Signing in...');
     try {
       const response = await api.post('/auth/login', { username, password });
       const { accessToken, displayName, userId } = response.data;
@@ -33,11 +33,11 @@ const LoginPage = () => {
       login(accessToken, { id: userId, displayName });
 
       toast.dismiss();
-      toast.success(`Welcome back, ${displayName}! The projector is warming up...`);
+      toast.success(`Welcome back, ${displayName}!`);
       navigate('/');
     } catch (error) {
       toast.dismiss();
-      toast.error('Access denied. Invalid credentials.');
+      toast.error('Invalid username or password');
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -91,13 +91,13 @@ const LoginPage = () => {
                   <Clapperboard size={32} className="text-white" />
                 </motion.div>
                 <h1
-                  className="text-6xl font-display text-text-main tracking-tight uppercase mb-2"
+                  className="text-5xl font-display text-text-main tracking-tight mb-2"
                   style={{ textShadow: '0 0 20px rgba(162, 89, 255, 0.5)' }}
                 >
-                  CINEMATIC AI
+                  ScryptSynth AI
                 </h1>
                 <p className="text-text-secondary text-lg">
-                  Step into your movieverse — powered by AI.
+                  Your AI content creation studio
                 </p>
               </motion.div>
 
@@ -110,7 +110,7 @@ const LoginPage = () => {
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Your cinematic alias"
+                    placeholder="Enter your username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all duration-300 text-lg"
@@ -126,7 +126,7 @@ const LoginPage = () => {
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your secret key"
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all duration-300 text-lg pr-12"
@@ -158,12 +158,12 @@ const LoginPage = () => {
                       >
                         <Zap size={20} />
                       </motion.div>
-                      <span className="ml-2">Loading Scene...</span>
+                      <span className="ml-2">Signing in...</span>
                     </span>
                   ) : (
                     <span className="flex items-center justify-center">
                       <Zap size={20} className="mr-2" />
-                      Enter the Studio
+                      Sign In
                     </span>
                   )}
                 </Button>
@@ -172,12 +172,12 @@ const LoginPage = () => {
               {/* Register Link */}
               <motion.div variants={fadeInUp} className="text-center mt-6 pt-6 border-t border-border">
                 <p className="text-text-secondary">
-                  First time here?{' '}
+                  Don't have an account?{' '}
                   <Link
                     to="/register"
                     className="font-bold text-primary hover:text-accent transition-colors duration-300 underline"
                   >
-                    Begin Your Story
+                    Create Account
                   </Link>
                 </p>
               </motion.div>
@@ -187,7 +187,7 @@ const LoginPage = () => {
           {/* Footer */}
           <motion.div variants={fadeInUp} className="text-center mt-8">
             <p className="text-text-secondary text-sm">
-              🎬 Curated by AI. Inspired by Cinema.
+              AI-powered content creation platform
             </p>
           </motion.div>
         </motion.div>

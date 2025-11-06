@@ -71,11 +71,11 @@ ScryptSynth AI          </span>
           Movie  Recommender
         </NavLink>
         <NavLink to="/ai-creator" icon={PenSquare}>
-          Story Creator
+          Content Creation
         </NavLink>
 
         <div className="flex items-center gap-3 sm:gap-4 pl-3 sm:pl-4 border-l border-border/50">
-          {/* Notifications */}
+          {/* Notifications
           <div className="relative group">
             <button className="p-2 rounded-lg text-text-secondary hover:text-primary hover:bg-surface/50 transition-all duration-300">
               <Bell size={20} />
@@ -85,7 +85,7 @@ ScryptSynth AI          </span>
             <div className="absolute top-full right-0 mt-2 w-64 bg-surface border border-border rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 p-4 z-50">
               <p className="text-sm text-text-secondary">You're all caught up — no new alerts!</p>
             </div>
-          </div>
+          </div> */}
 
           {/* Profile Dropdown */}
           <ProfileDropdown />

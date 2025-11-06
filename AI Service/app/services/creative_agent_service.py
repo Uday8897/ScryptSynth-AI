@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
@@ -6,285 +7,278 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.exceptions import OutputParserException
 from app.core.llm_client import groq_client
 from app.services.memory_service import MemoryService
-from app.services.tool_service import ToolService
 from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 class CreativeAgentService:
     def __init__(self):
         if groq_client is None:
             raise ValueError("Groq client not initialized.")
-        self.client = groq_client
-        self.memory_service = MemoryService()
-        self.tool_service = ToolService()
         
-        # Initialize LangChain Groq client
-        self.llm = ChatGroq(
-            model_name=settings.GROQ_MODEL_NAME,
-            temperature=0.7,
-            groq_api_key=settings.GROQ_API_KEY
-        )
-        
-        self.json_parser = JsonOutputParser()
+        try:
+            self.memory_service = MemoryService()
+            
+            self.llm = ChatGroq(
+                model_name=settings.GROQ_MODEL_NAME,
+                temperature=0.5,
+                groq_api_key=settings.GROQ_API_KEY
+            )
+            self.json_parser = JsonOutputParser()
+            logger.info("🚀 CreativeAgentService initialized (Full RAG w/ Supabase).")
+        except Exception as e:
+            logger.error(f"❌ FAILED to initialize CreativeAgentService: {e}", exc_info=True)
+            raise
 
     async def route_agent(self, user_id: str, query: str) -> Dict[str, Any]:
-        """
-        Main router that determines which agent to call based on the query
-        """
-        # Analyze the query to determine the intent
+        """Determines which agent to call based on user query."""
+        logger.info(f"🔍 Routing query for user {user_id}: '{query}'")
+        
         intent_prompt = ChatPromptTemplate.from_template("""
-        Analyze the user's query and classify it into one of these categories:
-        
-        Categories:
-        - "brainstorm_genre": User wants creative ideas for a specific genre (mentions genres, creative elements, plot ideas)
-        - "plan_shots": User wants camera shot suggestions for a scene (mentions shots, camera, scene, filming)
-        - "elaborate_idea": User wants to expand a simple concept into a story (mentions ideas, concepts, story development)
-        - "movie_recommendation": User wants movie suggestions (mentions movies, films, watch, recommend)
-        
-        User Query: {query}
-        
-        Respond ONLY with the category name from the list above.
+        Classify the user's intent into ONE of the following categories:
+        - "movie_recommendation"
+        - "idea_generation"
+        - "shorts_script"
+        - "caption_optimizer"
+        - "unknown"
+        Query: {query}
+        Respond ONLY with one label.
         """)
         
-        intent_chain = intent_prompt | self.llm
-        intent_response = await intent_chain.ainvoke({"query": query})
-        intent = intent_response.content.strip().lower()
-        
-        print(f"🔍 Detected intent: {intent}")
-        
-        # Route to appropriate agent
-        if intent == "brainstorm_genre":
-            return await self.brainstorm_genre_agent(query)
-        elif intent == "plan_shots":
-            return await self.plan_shots_agent(query)
-        elif intent == "elaborate_idea":
-            return await self.elaborate_idea_agent(query)
-        elif intent == "movie_recommendation":
-            return await self.get_ai_recommendation(user_id, query)
-        else:
-            # Default to movie recommendation
-            return await self.get_ai_recommendation(user_id, query)
+        try:
+            intent_chain = intent_prompt | self.llm
+            intent_response = await intent_chain.ainvoke({"query": query})
+            intent = intent_response.content.strip().lower().replace('"', '')
+            
+            logger.info(f"🎯 Detected intent: {intent}")
+            
+            similar_memories = self.memory_service.get_similar_memories(user_id, query, 'conversation', 3)
+            
+            # Route to appropriate agent
+            if intent == "movie_recommendation":
+                result = await self.get_ai_recommendation(user_id, query, similar_memories)
+            elif intent == "idea_generation":
+                result = await self.trend_idea_agent(query, similar_memories)
+            elif intent == "shorts_script":
+                result = await self.shorts_script_agent(query, similar_memories)
+            elif intent == "caption_optimizer":
+                result = await self.caption_optimizer_agent(query, similar_memories)
+            else:
+                logger.warning(f"⚠️ Intent '{intent}' is unknown, defaulting to movie recommendation.")
+                result = await self.get_ai_recommendation(user_id, query, similar_memories)
+            
+            self.memory_service.add_conversation_memory(user_id, query, json.dumps(result, default=str), intent)
+            return result
+                
+        except Exception as e:
+            logger.error(f"❌ Error in route_agent: {e}", exc_info=True)
+            return {"agent_type": "error", "error": str(e)}
 
-    async def brainstorm_genre_agent(self, query: str) -> Dict[str, Any]:
-        """
-        Agent for generating genre-specific creative elements
-        """
-        brainstorm_prompt = ChatPromptTemplate.from_template("""
-        You are a creative writing assistant specializing in genre storytelling.
-        
-        The user wants brainstorming help for: {query}
-        
-        Generate creative elements based on the genre and element type mentioned.
-        If the query is unclear, make reasonable assumptions about the genre and element type.
-        
-        Provide your response in the following JSON format:
+    async def trend_idea_agent(self, query: str, context: List[Dict] = None):
+        logger.info(f"💡 Brainstorming ideas for: '{query}'")
+        context_str = json.dumps(context or [])
+        prompt = ChatPromptTemplate.from_template("""
+        You are 'ViralTrendBot', an AI that helps content creators brainstorm trending video ideas.
+        Context: {context}
+        User Query: {query}
+        Task: Generate 3-5 creative content ideas.
+        Return JSON:
         {{
-            "agent_type": "brainstorm_genre",
-            "genre": "detected or assumed genre",
-            "element_type": "detected or assumed element type",
+            "agent_type": "idea_generation",
             "ideas": [
-                {{
-                    "title": "Idea title",
-                    "description": "Detailed description",
-                    "uniqueness": "What makes this unique",
-                    "implementation_tip": "How to use this idea"
-                }}
-            ],
-            "creative_prompts": [
-                "Prompt 1 to spark more creativity",
-                "Prompt 2 to explore further"
+                {{ "title": "...", "concept": "...", "difficulty": "easy", "hashtags": ["..."] }}
             ]
         }}
         """)
-        
         try:
-            chain = brainstorm_prompt | self.llm | self.json_parser
-            result = await chain.ainvoke({"query": query})
-            return result
-        except OutputParserException as e:
-            print(f"❌ JSON parsing error in brainstorm agent: {e}")
-            # Fallback: Try to extract JSON from the response
-            return await self._fallback_json_response("brainstorm_genre", str(e))
+            chain = prompt | self.llm | self.json_parser
+            return await chain.ainvoke({"query": query, "context": context_str})
         except Exception as e:
-            print(f"❌ Error in brainstorm agent: {e}")
-            return {
-                "agent_type": "brainstorm_genre",
-                "error": "Failed to generate creative ideas",
-                "ideas": []
-            }
+            logger.error(f"❌ Error in trend_idea_agent: {e}", exc_info=True)
+            return {"agent_type": "idea_generation", "error": str(e), "ideas": []}
 
-    async def plan_shots_agent(self, query: str) -> Dict[str, Any]:
-        """
-        Agent for planning camera shots and angles for scenes
-        """
-        shots_prompt = ChatPromptTemplate.from_template("""
-        You are a cinematography expert and film director.
-        
-        Scene description: {query}
-        
-        Analyze the scene and provide detailed shot recommendations considering:
-        - Camera angles and movements
-        - Lighting and composition
-        - Emotional impact
-        - Technical considerations
-        
-        Provide your response in the following JSON format:
-        {{
-            "agent_type": "plan_shots",
-            "scene_mood": "detected mood from description",
-            "shot_sequence": [
-                {{
-                    "shot_type": "e.g., Close-up, Wide shot, Tracking shot",
-                    "camera_angle": "e.g., Eye-level, Low angle, Dutch angle",
-                    "lens_suggestion": "e.g., 35mm, 50mm, 85mm",
-                    "purpose": "What this shot achieves emotionally/narratively",
-                    "lighting_notes": "Lighting suggestions",
-                    "movement": "Camera movement if any"
-                }}
-            ],
-            "overall_directorial_advice": "General filming recommendations",
-            "equipment_suggestions": ["Suggested equipment if relevant"]
-        }}
-        """)
-        
-        try:
-            chain = shots_prompt | self.llm | self.json_parser
-            result = await chain.ainvoke({"query": query})
-            return result
-        except OutputParserException as e:
-            print(f"❌ JSON parsing error in shots planning agent: {e}")
-            return await self._fallback_json_response("plan_shots", str(e))
-        except Exception as e:
-            print(f"❌ Error in shots planning agent: {e}")
-            return {
-                "agent_type": "plan_shots",
-                "error": "Failed to generate shot plan",
-                "shot_sequence": []
-            }
-
-    async def elaborate_idea_agent(self, query: str) -> Dict[str, Any]:
-        """
-        Agent for expanding simple concepts into full story foundations
-        """
-        elaborate_prompt = ChatPromptTemplate.from_template("""
-        You are a professional story developer and screenwriter.
-        
-        Core idea to elaborate: {query}
-        
-        Expand this simple concept into a rich story foundation including:
-        - Character development
-        - Plot structure
-        - Themes and motifs
-        - World-building elements
-        - Conflict and resolution
-        
-        Provide your response in the following JSON format:
-        {{
-            "agent_type": "elaborate_idea",
-            "core_concept": "The original idea summarized",
-            "expanded_premise": "Detailed story premise",
-            "main_characters": [
-                {{
-                    "name": "Character name",
-                    "role": "Protagonist/Antagonist/Supporting",
-                    "arc": "Character development journey",
-                    "motivation": "What drives this character",
-                    "flaws": "Character flaws and weaknesses"
-                }}
-            ],
-            "plot_structure": {{
-                "act1_setup": "Introduction and inciting incident",
-                "act2_confrontation": "Rising action and conflicts",
-                "act3_resolution": "Climax and conclusion"
-            }},
-            "themes": ["Theme 1", "Theme 2", "Theme 3"],
-            "key_scenes": [
-                {{
-                    "scene_name": "Scene title",
-                    "purpose": "What this scene accomplishes",
-                    "emotional_beat": "Emotional impact"
-                }}
-            ],
-            "development_questions": ["Questions to explore further"]
-        }}
-        """)
-        
-        try:
-            chain = elaborate_prompt | self.llm | self.json_parser
-            result = await chain.ainvoke({"query": query})
-            return result
-        except OutputParserException as e:
-            print(f"❌ JSON parsing error in idea elaboration agent: {e}")
-            return await self._fallback_json_response("elaborate_idea", str(e))
-        except Exception as e:
-            print(f"❌ Error in idea elaboration agent: {e}")
-            return {
-                "agent_type": "elaborate_idea",
-                "error": "Failed to elaborate the idea",
-                "main_characters": []
-            }
-
-    async def get_ai_recommendation(self, user_id: str, query: str) -> Dict[str, Any]:
-        """
-        Enhanced movie recommendation agent with JSON output
-        """
-        memories = self.memory_service.retrieve_memories(user_id=user_id, query_text=query)
-        movie_context = self.tool_service.search_movies(genre="sci-fi")
-
-        recommendation_prompt = ChatPromptTemplate.from_template("""
-        You are 'Curator AI', a movie recommendation expert.
-        
+    async def shorts_script_agent(self, query: str, context: List[Dict] = None):
+        logger.info(f"🎥 Creating shorts script for: '{query}'")
+        context_str = json.dumps(context or [])
+        prompt = ChatPromptTemplate.from_template("""
+        You are 'ReelWriter', a creative AI that crafts high-retention short-form scripts.
         User Query: {query}
-        User Memories: {memories}
-        Movie Context: {movie_context}
-        
-        Provide ONE personalized recommendation in the following JSON format:
+        Context: {context}
+        Output 1 engaging short-form script (30-60 seconds).
+        JSON format:
         {{
-            "agent_type": "movie_recommendation",
-            "recommendedMovie": {{
-                "title": "Movie Title",
-                "year": YYYY,
-                "tmdbId": 12345,
-                "rating": X.X
-            }},
-            "reasoningTitle": "Catchy title for explanation",
-            "reasoningIntro": "Short introductory sentence",
-            "comparisonTable": [
-                {{ "feature": "Feature 1", "match": "How it matches user taste" }},
-                {{ "feature": "Feature 2", "match": "Explanation" }},
-                {{ "feature": "Feature 3", "match": "Explanation" }}
-            ],
-            "bottomLine": "Concluding sentence"
+            "agent_type": "shorts_script",
+            "script": {{ "hook": "...", "body": "...", "cta": "...", "estimated_duration": "45s", "hashtags": ["..."] }}
         }}
         """)
+        try:
+            chain = prompt | self.llm | self.json_parser
+            return await chain.ainvoke({"query": query, "context": context_str})
+        except Exception as e:
+            logger.error(f"❌ Error in shorts_script_agent: {e}", exc_info=True)
+            return {"agent_type": "shorts_script", "error": str(e), "script": {}}
+
+    async def caption_optimizer_agent(self, query: str, context: List[Dict] = None):
+        logger.info(f"✍️ Optimizing caption for: '{query}'")
+        context_str = json.dumps(context or [])
+        prompt = ChatPromptTemplate.from_template("""
+        You are 'EngageAI', an AI that writes scroll-stopping hooks and captions.
+        Query: {query}
+        Context: {context}
+        Output 3 catchy social media posts.
+        Return JSON:
+        {{
+            "agent_type": "caption_optimizer",
+            "options": [
+                {{"title": "...", "caption": "...", "hashtags": ["..."], "tone": "funny"}},
+                {{"title": "...", "caption": "...", "hashtags": ["..."], "tone": "inspirational"}}
+            ]
+        }}
+        """)
+        try:
+            chain = prompt | self.llm | self.json_parser
+            return await chain.ainvoke({"query": query, "context": context_str})
+        except Exception as e:
+            logger.error(f"❌ Error in caption_optimizer_agent: {e}", exc_info=True)
+            return {"agent_type": "caption_optimizer", "error": str(e), "options": []}
+
+    async def get_ai_recommendation(self, user_id: str, query: str, context: List[Dict] = None) -> Dict[str, Any]:
+        """Recommends movies using a 100% RAG pipeline from Supabase."""
+        logger.info(f"🧠 RAG RECOMMENDATION for user {user_id}: '{query}'")
         
         try:
+            # 1. Get User's Taste Profile
+            user_preferences = self.memory_service.analyze_user_preferences(user_id)
+            user_reviews = self.memory_service.get_user_reviews(user_id, limit=5)
+            
+            # 2. RAG: Find movies in the KB that match the USER'S QUERY
+            movie_context = self.memory_service.find_similar_movies(query, limit=10)
+            
+            logger.info(f"🎯 RAG found {len(movie_context)} movies matching query.")
+
+            # 3. LLM Call: Generate the final recommendation
+            recommendation_prompt = ChatPromptTemplate.from_template("""
+            You are 'Curator AI', an intelligent movie recommendation expert.
+            
+            USER QUERY: {query}
+            
+            USER'S TASTE PROFILE (from past reviews): {user_preferences}
+            
+            USER'S RECENT REVIEWS:
+            {user_reviews}
+            
+            AVAILABLE MOVIES (Found in our library matching the query):
+            {movie_context}
+            
+            INSTRUCTIONS:
+            1. Analyze all inputs.
+            2. Select the *single best movie* from the AVAILABLE MOVIES list.
+            3. Calculate a "match_confidence" (a float between 0.0 and 1.0).
+            4. If no movies are found (movie_context is empty) OR no movie in the list is a good match, return "recommendations": []. DO NOT HALLUCINATE.
+            
+            IMPORTANT: For each recommended movie, you MUST include:
+            - All the original fields from the movie data
+            - A "match_confidence" field with a float value
+            - Ensure "tmdbId" is always an integer (use 0 if not available)
+            
+            Provide your response in this exact JSON format:
+            {{
+                "agent_type": "movie_recommendation",
+                "user_insights": {{
+                    "preference_confidence": {preference_confidence},
+                    "preferred_genres": {preferred_genres},
+                    "personalization_level": "high|medium|low"
+                }},
+                "recommendations": [
+                    {{
+                        "title": "...",
+                        "year": ...,
+                        "rating": ...,
+                        "genres": ["..."],
+                        "overview": "...",
+                        "tmdbId": 12345,  // MUST be integer
+                        "poster_path": "...",
+                        "poster_url": "...",
+                        "source": "...",
+                        "similarity": ...,
+                        "match_confidence": 0.85  // REQUIRED field
+                    }}
+                ],
+                "personalized_explanation": "Detailed explanation...",
+                "next_suggestions": ["Suggest a different genre", "Ask for a specific actor"]
+            }}
+            """)
+            
             chain = recommendation_prompt | self.llm | self.json_parser
+            
+            preference_confidence_score = 0.8 if user_preferences.get("has_history") else 0.2
+            
             result = await chain.ainvoke({
                 "query": query,
-                "memories": memories if memories else "No specific memories found",
-                "movie_context": movie_context
+                "user_reviews": json.dumps(user_reviews, indent=2) if user_reviews else "No review history yet",
+                "user_preferences": json.dumps(user_preferences, indent=2),
+                "preferred_genres": user_preferences.get("genres", []),
+                "preference_confidence": preference_confidence_score,
+                "movie_context": json.dumps(movie_context, indent=2),
+                "movie_count": len(movie_context),
             })
+            
+            # 4. Post-process the result to ensure data integrity
+            result = self._validate_recommendation_result(result, movie_context)
+            
+            logger.info(f"✅ RAG recommendations generated. Found {len(result.get('recommendations', []))} matches.")
             return result
-        except OutputParserException as e:
-            print(f"❌ JSON parsing error in recommendation agent: {e}")
-            return await self._fallback_json_response("movie_recommendation", str(e))
+            
         except Exception as e:
-            print(f"❌ Error in recommendation agent: {e}")
+            logger.error(f"❌ Error in RAG recommendation: {e}", exc_info=True)
             return {
                 "agent_type": "movie_recommendation",
-                "error": "Failed to generate recommendation",
-                "recommendedMovie": None
+                "error": "Failed to generate intelligent recommendations",
+                "recommendations": [],
+                "search_details": {"query": query, "error": str(e)}
             }
+    
+    def _validate_recommendation_result(self, result: Dict[str, Any], original_movies: List[Dict]) -> Dict[str, Any]:
+        """Validate and fix recommendation result data integrity."""
+        if "recommendations" not in result:
+            result["recommendations"] = []
+            return result
+            
+        validated_recommendations = []
+        
+        for rec in result["recommendations"]:
+            # Ensure tmdbId is integer
+            if "tmdbId" in rec:
+                try:
+                    rec["tmdbId"] = int(rec["tmdbId"]) if rec["tmdbId"] is not None else 0
+                except (ValueError, TypeError):
+                    rec["tmdbId"] = 0
+            
+            # Ensure match_confidence exists
+            if "match_confidence" not in rec:
+                # Calculate match confidence from similarity if available
+                similarity = rec.get("similarity", 0.0)
+                rec["match_confidence"] = min(1.0, max(0.0, similarity * 1.2))  # Scale similarity to confidence
+            
+            # Ensure all required fields exist
+            required_fields = ["title", "year", "rating", "genres", "overview", "tmdbId", "source"]
+            for field in required_fields:
+                if field not in rec:
+                    rec[field] = "" if field == "overview" else [] if field == "genres" else 0
+            
+            validated_recommendations.append(rec)
+        
+        result["recommendations"] = validated_recommendations
+        return result
 
     async def _fallback_json_response(self, agent_type: str, error_message: str) -> Dict[str, Any]:
-        """
-        Fallback method when JSON parsing fails
-        """
+        """Fallback method when JSON parsing fails."""
+        logger.warning(f"⚠️ JSON parsing failed for {agent_type}. Error: {error_message}")
         return {
             "agent_type": agent_type,
-            "error": "Failed to parse AI response",
+            "error": "Failed to parse AI response as JSON",
             "raw_error": error_message,
-            "suggestion": "Please try again with a different query"
+            "suggestion": "Please try again. The AI's response was not in the correct format."
         }
 
 # Singleton instance

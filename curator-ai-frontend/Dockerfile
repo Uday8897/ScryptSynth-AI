@@ -1,34 +1,34 @@
-# --- STAGE 1: Build the React App ---
+# Step 1: Build the Vite app
 FROM node:20-alpine AS builder
 
-# Set working directory
+# Create app directory
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
+# Install dependencies
+COPY package.json package-lock.json ./
 RUN npm install
 
-# Copy rest of the app
+# Copy rest of the app code
 COPY . .
 
-# Build the app (without hardcoding any API URL)
+# Set the API URL for production build (can be overridden)
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
+# Build the app
 RUN npm run build
 
-# --- STAGE 2: Serve with NGINX ---
-FROM nginx:1.27-alpine
+# Step 2: Serve with Nginx
+FROM nginx:stable-alpine
 
-# Copy the custom NGINX configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy built static files
+# Copy built static files to Nginx HTML folder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy startup script to inject env vars dynamically
-COPY ./docker-entrypoint.sh /docker-entrypoint.d/env.sh
-RUN chmod +x /docker-entrypoint.d/env.sh
+# Replace default Nginx config with our own
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose NGINX port
+# Expose port
 EXPOSE 80
 
-# Run NGINX in foreground
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

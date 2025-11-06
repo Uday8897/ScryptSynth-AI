@@ -14,7 +14,18 @@ spring:
 
   rabbitmq:
     host: localhost
-
+resilience4j:
+  circuitbreaker:
+    instances:
+      userService:
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        minimum-number-of-calls: 10
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
 eureka:
   client:
     service-url:

@@ -8,6 +8,8 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+
 @Configuration
 public class RabbitMQConfig {
 
@@ -19,20 +21,23 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue queue() {
-        return new Queue(amqpConfigProperties.getQueue());
+        // ✅ Make queue durable so it persists on RabbitMQ restart
+        return new Queue(amqpConfigProperties.getQueue(), true);
     }
 
     @Bean
     public TopicExchange exchange() {
-        return new TopicExchange(amqpConfigProperties.getExchange());
+        return new TopicExchange(amqpConfigProperties.getExchange(), true, false);
     }
 
     @Bean
     public Binding binding(Queue queue, TopicExchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(amqpConfigProperties.getRoutingKey());
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(amqpConfigProperties.getRoutingKey());
     }
 
-    // This converter allows sending DTO objects as JSON directly
     @Bean
     public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();

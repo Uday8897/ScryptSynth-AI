@@ -6,7 +6,7 @@ import ReviewModal from '../components/ui/ReviewModal';
 import { fadeIn, fadeInUp, staggerContainer } from '../animations/variants';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
-import { LoaderCircle } from 'lucide-react'; // Import Loader
+import { LoaderCircle, Star, BarChart3 } from 'lucide-react';
 
 const HomePage = () => {
   const { user } = useAuth();
@@ -15,14 +15,30 @@ const HomePage = () => {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [movieToReview, setMovieToReview] = useState(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [userInsights, setUserInsights] = useState(null);
 
-  // --- FETCH NOW PLAYING MOVIES ---
+  // Fetch user insights on component mount
+  useEffect(() => {
+    if (user?._id) {
+      loadUserInsights();
+    }
+  }, [user]);
+
+  const loadUserInsights = async () => {
+    try {
+      const res = await api.get(`/api/ai/users/${user._id}/insights`);
+      setUserInsights(res.data);
+    } catch (error) {
+      console.error('Failed to load user insights:', error);
+    }
+  };
+
+  // Fetch now playing movies
   useEffect(() => {
     const fetchNowPlaying = async () => {
       setIsLoadingMovies(true);
       try {
         console.log("Fetching Now Playing movies...");
-        // --- CALL THE NEW ENDPOINT ---
         const response = await api.get('/api/content/now-playing?region=IN');
         
         const movies = Array.isArray(response.data) ? response.data : [];
@@ -38,11 +54,10 @@ const HomePage = () => {
       }
     };
     fetchNowPlaying();
-  }, []); // Fetch only once on mount
+  }, []);
 
-  // --- MODAL HANDLERS ---
+  // Modal handlers
   const handleOpenReviewModal = (movie) => {
-    // We must use 'movie.id' because our Pydantic model maps '_id' to 'id'
     if (!movie || typeof movie.id === 'undefined') {
         console.error("Movie object is invalid or missing ID:", movie);
         toast.error("Cannot review movie: data is missing.");
@@ -57,39 +72,61 @@ const HomePage = () => {
     setMovieToReview(null);
   };
 
-  // --- REVIEW SUBMISSION HANDLER ---
-  const handleSubmitReview = async ({ rating, reviewText }) => {
-    if (!movieToReview || !user || !user.id) {
-      toast.error('Cannot submit review: user not logged in or movie data missing.');
-      return;
-    }
-    setIsSubmittingReview(true);
-    const loadingToast = toast.loading('Submitting your review...');
+  // Enhanced review submission with AI memory storage
+  // In your HomePage component, update the handleSubmitReview function:
+
+const handleSubmitReview = async ({ rating, reviewText }) => {
+  const userId = user?._id || user?.id;
+  if (!movieToReview || !userId) {
+    toast.error('Cannot submit review: user not logged in or movie data missing.');
+    return;
+  }
+  
+  setIsSubmittingReview(true);
+  const loadingToast = toast.loading('Submitting your review and updating AI memory...');
+  
+  try {
+    const contentIdentifier = movieToReview.id; 
+    
+    // 1. Submit to history service
+    const historyPayload = {
+      userId: String(userId),
+      contentId: String(contentIdentifier),
+      rating: rating,
+      reviewText: reviewText,
+    };
+
+    console.log("Submitting review payload:", historyPayload);
+    await api.post('/api/history', historyPayload);
+
+    // 2. Store in AI memory for better recommendations
     try {
-      // Your Pydantic model maps '_id' to 'id', so we always use 'id'
-      const contentIdentifier = movieToReview.id; 
-      
-      const payload = {
-        userId: String(user.id),
-        contentId: String(contentIdentifier), // Use the correct ID
+      await api.post('/api/ai/reviews/add', {
+        user_id: String(userId),
+        movie_title: movieToReview.title,
+        review_text: reviewText,
         rating: rating,
-        reviewText: reviewText,
-      };
-
-      console.log("Submitting review payload:", payload);
-      await api.post('/api/history', payload);
-
-      toast.dismiss(loadingToast);
-      toast.success('Review submitted successfully!');
-      handleCloseReviewModal();
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      toast.error('Failed to submit review. Please try again.');
-      console.error("Review submission error:", error.response?.data || error.message);
-    } finally {
-      setIsSubmittingReview(false);
+      });
+      console.log("Review stored in AI memory");
+    } catch (memoryError) {
+      console.warn("Failed to store in AI memory, but review was saved:", memoryError);
     }
-  };
+
+    toast.dismiss(loadingToast);
+    toast.success('Review submitted! AI will use this for better recommendations.');
+    handleCloseReviewModal();
+    
+    // Reload user insights to reflect new review
+    loadUserInsights();
+    
+  } catch (error) {
+    toast.dismiss(loadingToast);
+    toast.error('Failed to submit review. Please try again.');
+    console.error("Review submission error:", error.response?.data || error.message);
+  } finally {
+    setIsSubmittingReview(false);
+  }
+};
 
   return (
     <motion.main
@@ -98,6 +135,55 @@ const HomePage = () => {
       variants={fadeIn}
       className="p-8"
     >
+      {/* User Insights Panel */}
+      {userInsights && userInsights.total_reviews > 0 && (
+        <motion.div variants={fadeInUp} className="mb-8 p-6 rounded-2xl bg-surface/50 border border-border">
+          <div className="flex items-center gap-3 mb-4">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-text-main">Your Movie Profile</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-2xl font-display text-primary mb-1">{userInsights.total_reviews}</div>
+              <div className="text-text-secondary">Reviews</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-display text-primary mb-1 flex items-center justify-center gap-1">
+                {userInsights.insights?.average_rating ? userInsights.insights.average_rating.toFixed(1) : 'N/A'}
+                <Star className="w-4 h-4 fill-current" />
+              </div>
+              <div className="text-text-secondary">Avg Rating</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-display text-primary mb-1">
+                {userInsights.insights?.genres?.length || 0}
+              </div>
+              <div className="text-text-secondary">Genres</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-display text-primary mb-1">
+                {userInsights.insights?.preferred_movies?.length || 0}
+              </div>
+              <div className="text-text-secondary">Movies</div>
+            </div>
+          </div>
+          
+          {userInsights.insights?.genres?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-text-secondary text-sm mb-2">Your Preferred Genres:</p>
+              <div className="flex flex-wrap gap-2">
+                {userInsights.insights.genres.slice(0, 5).map((genre, index) => (
+                  <span key={index} className="px-3 py-1 bg-primary/20 text-primary rounded-full text-xs border border-primary/30">
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Now Playing Section */}
       <motion.h2
         variants={fadeInUp}
         className="mb-8 text-4xl font-display text-text-main tracking-wider uppercase"
@@ -120,9 +206,10 @@ const HomePage = () => {
         >
             {nowPlayingMovies.map(movie => (
                 <MovieCard
-                    key={movie.id} // Use 'id' as Pydantic model provides it
+                    key={movie.id}
                     movie={movie}
                     onReviewClick={() => handleOpenReviewModal(movie)}
+                    showReviewButton={true}
                 />
             ))}
         </motion.div>
@@ -135,7 +222,7 @@ const HomePage = () => {
          </motion.div>
       )}
 
-      {/* Render Review Modal */}
+      {/* Review Modal */}
       <AnimatePresence>
         {isReviewModalOpen && movieToReview && (
           <ReviewModal

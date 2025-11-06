@@ -24,11 +24,11 @@ const RegisterPage = () => {
     }
 
     setIsLoading(true);
-    toast.loading('Creating your cinematic profile...');
+    toast.loading('Creating account...');
     try {
       await api.post('/auth/register', { username, email, password });
       toast.dismiss();
-      toast.success('Welcome to the cinema! Your account has been created.');
+      toast.success('Account created successfully!');
       navigate('/login');
     } catch (error) {
       toast.dismiss();
@@ -100,15 +100,15 @@ const RegisterPage = () => {
                 <motion.div
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.3 }}
-                  className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-secondary to-red-500 rounded-2xl shadow-2xl mb-6"
+                  className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-primary to-purple-600 rounded-2xl shadow-2xl mb-6"
                 >
-                  <Star size={32} className="text-white" />
+                  <Clapperboard size={32} className="text-white" />
                 </motion.div>
-                <h1 className="text-6xl font-display text-text-main tracking-tight uppercase mb-2" 
-                    style={{ textShadow: '0 0 20px rgba(255, 99, 99, 0.5)' }}>
-                  JOIN THE SCREEN
+                <h1 className="text-5xl font-display text-text-main tracking-tight mb-2" 
+                    style={{ textShadow: '0 0 20px rgba(162, 89, 255, 0.5)' }}>
+                  ScryptSynth AI
                 </h1>
-                <p className="text-text-secondary text-lg">Begin your cinematic journey today.</p>
+                <p className="text-text-secondary text-lg">Create your account</p>
               </motion.div>
 
               {/* Input Fields */}
@@ -120,10 +120,10 @@ const RegisterPage = () => {
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Choose your username"
+                    placeholder="Choose a username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-secondary focus:ring-4 focus:ring-secondary/20 transition-all duration-300 text-lg"
+                    className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all duration-300 text-lg"
                     icon={<User size={20} className="text-text-secondary" />}
                   />
                 </div>
@@ -138,7 +138,7 @@ const RegisterPage = () => {
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-secondary focus:ring-4 focus:ring-secondary/20 transition-all duration-300 text-lg"
+                    className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all duration-300 text-lg"
                     icon={<Mail size={20} className="text-text-secondary" />}
                   />
                 </div>
@@ -151,15 +151,15 @@ const RegisterPage = () => {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Create your password"
+                      placeholder="Create a password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-secondary focus:ring-4 focus:ring-secondary/20 transition-all duration-300 text-lg pr-12"
+                      className="w-full p-4 rounded-xl bg-background border-2 border-border focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all duration-300 text-lg pr-12"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-secondary transition-colors"
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-primary transition-colors"
                     >
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
@@ -173,7 +173,7 @@ const RegisterPage = () => {
                   type="submit" 
                   isLoading={isLoading}
                   disabled={!username.trim() || !email.trim() || !password.trim()}
-                  className="w-full py-4 text-lg font-semibold bg-gradient-to-r from-secondary to-red-500 hover:from-secondary/90 hover:to-red-500/90 transform hover:scale-105 transition-all duration-300 shadow-2xl border-0"
+                  className="w-full py-4 text-lg font-semibold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transform hover:scale-105 transition-all duration-300 shadow-2xl border-0"
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center">
@@ -181,14 +181,14 @@ const RegisterPage = () => {
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       >
-                        <Film size={20} />
+                        <Zap size={20} />
                       </motion.div>
-                      <span className="ml-2">Creating Profile...</span>
+                      <span className="ml-2">Creating Account...</span>
                     </span>
                   ) : (
                     <span className="flex items-center justify-center">
-                      <Star size={20} className="mr-2" />
-                      Start Journey
+                      <Zap size={20} className="mr-2" />
+                      Create Account
                     </span>
                   )}
                 </Button>
@@ -200,9 +200,9 @@ const RegisterPage = () => {
                   Already have an account?{' '}
                   <Link 
                     to="/login" 
-                    className="font-bold text-secondary hover:text-primary transition-colors duration-300 underline"
+                    className="font-bold text-primary hover:text-accent transition-colors duration-300 underline"
                   >
-                    Enter Cinema
+                    Sign In
                   </Link>
                 </p>
               </motion.div>
@@ -212,7 +212,7 @@ const RegisterPage = () => {
           {/* Footer */}
           <motion.div variants={fadeInUp} className="text-center mt-8">
             <p className="text-text-secondary text-sm">
-              Join millions in discovering your next favorite film
+              AI-powered content creation platform
             </p>
           </motion.div>
         </motion.div>
