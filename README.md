@@ -70,8 +70,17 @@ Your recommendation system is an asynchronous, AI-driven process that learns fro
 4.  **Knowledge Base Embedding:** The AI service processes this review and **embeds** it (turns it into a numerical vector representation). This embedding is then stored in a **User Knowledge Base** within your **Supabase database**. This builds a unique "taste profile" for each user.
 5.  **Generating Recommendations:** When a user asks for recommendations, the system queries its main **Movie Knowledge Base**. It uses the data from the user's personal **User Knowledge Base** to find movies that are "semantically similar" to the reviews the user has previously given.
 6.  **Display:** The system returns these movie suggestions to the frontend for the user to see.
-7.  ![25aaa6c8-6484-41da-aa01-603c162c10a7](https://github.com/user-attachments/assets/36c01721-f282-4539-af92-9df6c114a6b1)
-8.  ![a6502c7f-ea21-4884-a769-8004e95ae507](https://github.com/user-attachments/assets/e8312942-1903-46fc-b4ff-7f378b8cddef)
-![60f09c31-8ca6-486f-a8a4-bb7a6d8b3e1a](https://github.com/user-attachments/assets/04ec5136-80f8-446e-9552-34806ae5fbc7)
 ![d67c9822-6d59-42e5-97a9-0a9a8a7ece50](https://github.com/user-attachments/assets/11d8eaf0-2a51-445d-b42f-50ecf3a9f2c4)
+
+
+8.  ![25aaa6c8-6484-41da-aa01-603c162c10a7](https://github.com/user-attachments/assets/36c01721-f282-4539-af92-9df6c114a6b1)
+
+
+9.  ![a6502c7f-ea21-4884-a769-8004e95ae507](https://github.com/user-attachments/assets/e8312942-1903-46fc-b4ff-7f378b8cddef)
+
+
+![60f09c31-8ca6-486f-a8a4-bb7a6d8b3e1a](https://github.com/user-attachments/assets/04ec5136-80f8-446e-9552-34806ae5fbc7)
+
+
+
 ![c7f459da-d59a-4bad-97c6-745f36b4ec9b](https://github.com/user-attachments/assets/50d49451-1e87-4b8f-9de8-273599adc3f0)
